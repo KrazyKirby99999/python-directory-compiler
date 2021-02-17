@@ -6,8 +6,9 @@ A wrapper for Nuitka that walks through a directory tree and compiles all .py Py
 usage: py-dir-compiler [-h] [-e EXCLUDE [EXCLUDE ...]] [-ds]
 
 optional arguments:
+
   -h, --help            show this help message and exit
-  
+
   -e EXCLUDE [EXCLUDE ...], --exclude EXCLUDE [EXCLUDE ...]
                         (Usage: -e <filename>) (Usage: -e <foldername>)
                         Exclude folder(s)/file(s) from compilation. Use
