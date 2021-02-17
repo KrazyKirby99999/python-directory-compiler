@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+import argparse
+import os
+import shutil
+
+# parse args
+parser = argparse.ArgumentParser()
+parser.add_argument("-e", "--exclude",
+                    help="(Usage: -e <filename>) (Usage: -e <foldername>) Exclude folder(s)/file(s) from compilation. Use absolute path if multiple folders share the same name.", action="append", nargs='+')
+parser.add_argument("-ds", "--delete_source",
+                    help="(Usage: -ds) Removes source .py files after compilation. Preserves folder structure.", action="store_true")
+
+args = parser.parse_args()
+
+path = os.path.realpath(".")
+
+excluded = ["__init__.py", "src-before-py-dir-compile", ".build"]
+if args.exclude:
+    for exclusion in args.exclude:
+        if isinstance(exclusion, list):
+            excluded.append(exclusion[0])
+        else:
+            excluded.append(exclusion)
+
+# backup source .py files
+if not args.delete_source:
+    shutil.copytree(path, os.path.join(path, "src-before-py-dir-compile"))
+
+# determine changed file extension e.g. ".py" -> ".cpython-38-x86_64-linux-gnu.so"
+with open("py-dir-compiler-temp.py", "w") as f:
+    f.write("#Temp file used to determine os, architecture, etc. neccesary information needed for compilation.")
+os.system("python3 -m nuitka --module py-dir-compiler-temp.py")
+os.remove("py-dir-compiler-temp.py")
+for file in os.listdir():
+    if "py-dir-compiler-temp" in file:
+        file_ext = file.replace("py-dir-compiler-temp", "")
+        if (".so" in file) or (".pyd" in file):
+            os.remove(file)
+os.remove("py-dir-compiler-temp.pyi")
+shutil.rmtree("py-dir-compiler-temp.build")
+
+# walk through files in dirs and subdirs, compile to create new .pyd/.so files, and remove old .py files
+for root, dirs, files in os.walk(path):
+    for file in files:
+        exclude = False
+        if (file in excluded):
+            exclude = True
+        for exclusion in excluded:
+            if exclusion in root:
+                exclude = True
+        if (file.endswith(".py")) and (not exclude):
+            os.chdir(root)
+            if (" " in file) or (" " in root):
+                os.system("python3 -m nuitka --module \"" +
+                    os.path.join(file)+"\"")
+            else:
+                os.system("python3 -m nuitka --module " +
+                    os.path.join(file))
+            os.chdir(path)
+            os.remove(os.path.join(root, file))
+        else:
+            print("Excluding file - " + os.path.join(root, file))
+
+# walk through files in dirs and subdirs, rename new .pyd/.so files
+for root, dirs, files in os.walk(path):
+    for file in files:
+        if(file.endswith(file_ext)):
+            if (".so" in file):
+                os.rename(os.path.join(root, file), os.path.join(
+                    root, file).replace(file_ext, ".so"))
+            if (".pyd" in file):
+                os.rename(os.path.join(root, file), os.path.join(
+                    root, file).replace(file_ext, ".pyd"))
+
+# walk through files in dirs and subdirs, remove unwanted .pyi files, remove __pycache__ folders, and remove .build folders
+for root, dirs, files in os.walk(path):
+    for file in files:
+        if(file.endswith(".pyi")):
+            os.remove(os.path.join(root, file))
+for root, dirs, files in os.walk(path):
+    for dir in dirs:
+        if ('__pycache__' in dir) or ('.build' in dir):
+            shutil.rmtree(os.path.join(root, dir))
