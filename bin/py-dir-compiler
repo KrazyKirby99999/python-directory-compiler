@@ -9,10 +9,13 @@ parser.add_argument("-e", "--exclude",
                     help="(Usage: -e <filename>) (Usage: -e <foldername>) Exclude folder(s)/file(s) from compilation. Use absolute path if multiple folders share the same name.", action="append", nargs='+')
 parser.add_argument("-ds", "--delete_source",
                     help="(Usage: -ds) Removes source .py files after compilation. Preserves folder structure.", action="store_true")
+parser.add_argument("-py", "--python",
+                    help="(Usage: -py <python>) Selects python interpreter to use during compilation. Defaults to \"python\"", action="store_true")
 
 args = parser.parse_args()
 
 path = os.path.realpath(".")
+isWindows = (os.name == 'nt')
 
 excluded = ["__init__.py", "src-before-py-dir-compile", ".build"]
 if args.exclude:
@@ -22,6 +25,11 @@ if args.exclude:
         else:
             excluded.append(exclusion)
 
+if args.python:
+    pypath = args.python
+else:
+    pypath = "python"
+
 # backup source .py files
 if not args.delete_source:
     shutil.copytree(path, os.path.join(path, "src-before-py-dir-compile"))
@@ -29,15 +37,16 @@ if not args.delete_source:
 # determine changed file extension e.g. ".py" -> ".cpython-38-x86_64-linux-gnu.so"
 with open("py-dir-compiler-temp.py", "w") as f:
     f.write("#Temp file used to determine os, architecture, etc. neccesary information needed for compilation.")
-os.system("python3 -m nuitka --module py-dir-compiler-temp.py")
+os.system(pypath + " -m nuitka --module py-dir-compiler-temp.py")
 os.remove("py-dir-compiler-temp.py")
 for file in os.listdir():
     if "py-dir-compiler-temp" in file:
         file_ext = file.replace("py-dir-compiler-temp", "")
         if (".so" in file) or (".pyd" in file):
             os.remove(file)
-os.remove("py-dir-compiler-temp.pyi")
-shutil.rmtree("py-dir-compiler-temp.build")
+if not isWindows:
+    os.remove("py-dir-compiler-temp.pyi")
+    shutil.rmtree("py-dir-compiler-temp.build")
 
 # walk through files in dirs and subdirs, compile to create new .pyd/.so files, and remove old .py files
 for root, dirs, files in os.walk(path):
@@ -51,10 +60,10 @@ for root, dirs, files in os.walk(path):
         if (file.endswith(".py")) and (not exclude):
             os.chdir(root)
             if (" " in file) or (" " in root):
-                os.system("python3 -m nuitka --module \"" +
+                os.system(pypath + " -m nuitka --module \"" +
                     os.path.join(file)+"\"")
             else:
-                os.system("python3 -m nuitka --module " +
+                os.system(pypath + " -m nuitka --module " +
                     os.path.join(file))
             os.chdir(path)
             os.remove(os.path.join(root, file))
